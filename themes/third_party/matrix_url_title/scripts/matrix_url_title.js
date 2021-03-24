@@ -31,7 +31,7 @@ Matrix.bind('matrix_url_title', 'display', function(cell){
 
 		$titleInput.bind('blur, keyup', function() {
 			// start with the Title value
-			var val = $titleInput.val();
+			var val = $(this).val();
 
 			// make it lowercase and use the correct word separator
 			val = val.toLowerCase().replace(wrongSep, sep);

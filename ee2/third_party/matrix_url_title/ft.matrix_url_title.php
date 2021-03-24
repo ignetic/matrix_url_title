@@ -12,11 +12,14 @@ class Matrix_url_title_ft extends EE_Fieldtype {
 
 	var $info = array(
 		'name' => 'Matrix URL Title',
-		'version' => '1.0'
+		'version' => '1.0.1'
 	);
 
 	var $default_settings = array(
 		'title_col' => '',
+		'word_separator' => '',
+		'unique_titles' => '',
+		'allow_numerics' => '',
 		'dir' => 'ltr'
 	);
 
@@ -27,7 +30,7 @@ class Matrix_url_title_ft extends EE_Fieldtype {
 	 */
 	function __construct()
 	{
-		$this->EE =& get_instance();
+		$this->EE = get_instance();
 
 		// -------------------------------------------
 		//  Prepare Cache
@@ -69,7 +72,19 @@ class Matrix_url_title_ft extends EE_Fieldtype {
 	 */
 	private function _include_theme_js($file)
 	{
+		if (! empty($this->settings['word_separator']))
+		{
+			$word_separator = $this->settings['word_separator'] != "dash" ? '_' : '-';
+		}
+		else 
+		{
+			$word_separator = $this->EE->config->item('word_separator') != "dash" ? '_' : '-';
+		}
+
 		$this->EE->cp->add_to_foot('<script type="text/javascript" src="'.$this->_theme_url().$file.'"></script>');
+		$this->EE->javascript->set_global(array(
+				'publish.word_separator'	=> $word_separator
+			));
 	}
 
 	// --------------------------------------------------------------------
@@ -79,13 +94,23 @@ class Matrix_url_title_ft extends EE_Fieldtype {
 	 */
 	function display_cell_settings($data)
 	{
+
 		$this->_prep_settings($data);
 
 		// load the language file
 		$this->EE->lang->loadfile('matrix_url_title');
+		
+		$separator_select = array(
+			'' => 'default',
+			'dash' => 'dash',
+			'underscore' => 'underscore'
+		);
 
 		return array(
-			array(lang('title_col'), form_input('title_col', $data['title_col'], 'class="matrix-textarea"'))
+			array(lang('title_col'), form_input('title_col', $data['title_col'], 'class="matrix-textarea"')),
+			array(lang('unique_titles'), form_checkbox('unique_titles', 'y', (isset($data['unique_titles']) && $data['unique_titles'] == 'y'))),
+			array(lang('allow_numerics'), form_checkbox('allow_numerics', 'y', (isset($data['allow_numerics']) && $data['allow_numerics'] == 'y'))),
+			array(lang('word_separator'), form_dropdown('word_separator', $separator_select, $data['word_separator']))
 		);
 	}
 
@@ -137,8 +162,14 @@ class Matrix_url_title_ft extends EE_Fieldtype {
 	 */
 	function save_cell($data)
 	{
+		$allow_numerics = isset($this->settings['allow_numerics']) && $this->settings['allow_numerics'] == 'y' ? TRUE : FALSE;
+		$unique_titles = isset($this->settings['unique_titles']) && $this->settings['unique_titles'] == 'y' ? TRUE : FALSE;
+		
+		// ignore if empty
+		if ( $data === '' ) return '';
+
 		// ignore if empty or numeric
-		if (! $data || is_numeric($data)) return '';
+		if (! $allow_numerics && is_numeric($data)) return '';
 
 		// is this a new row?
 		$new = (substr($this->settings['row_name'], 0, 8) == 'row_new_');
@@ -149,6 +180,12 @@ class Matrix_url_title_ft extends EE_Fieldtype {
 			$row_id = substr($this->settings['row_name'], 7);
 		}
 
+		// if don't need unique titles then return it
+		if (! $unique_titles)
+		{
+			return $data;
+		}
+		
 		// try up to 50 different URL titles
 		for ($i = 0; $i < 50; $i++)
 		{
